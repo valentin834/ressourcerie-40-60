@@ -14,20 +14,98 @@ interface Props {
 
 type EditableField = keyof Pick<Tool, 'name' | 'type' | 'category' | 'interest' | 'implementation_time' | 'what_is_it' | 'what_for' | 'studio_interest'>
 
+interface EditableTextProps {
+  field: EditableField
+  value: string
+  isEditing: boolean
+  draft: string
+  inputRef: React.RefObject<HTMLTextAreaElement | null>
+  onStartEdit: (field: EditableField, value: string) => void
+  onDraftChange: (v: string) => void
+  onSave: (field: EditableField, value: string) => void
+  onCancelEdit: () => void
+}
+
+function EditableText({ field, value, isEditing, draft, inputRef, onStartEdit, onDraftChange, onSave, onCancelEdit }: EditableTextProps) {
+  if (isEditing) {
+    return (
+      <textarea
+        ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+        className="editable-textarea"
+        value={draft}
+        onChange={(e) => onDraftChange(e.target.value)}
+        onBlur={() => onSave(field, draft)}
+        onKeyDown={(e) => { if (e.key === 'Escape') onCancelEdit() }}
+      />
+    )
+  }
+  return (
+    <span className="editable" onClick={() => onStartEdit(field, value)}>
+      {value || <em style={{ color: 'var(--text-dim)' }}>Cliquer pour éditer…</em>}
+    </span>
+  )
+}
+
+interface EditableSelectProps {
+  field: EditableField
+  value: string
+  options: string[]
+  isEditing: boolean
+  draft: string
+  inputRef: React.RefObject<HTMLSelectElement | null>
+  onStartEdit: (field: EditableField, value: string) => void
+  onDraftChange: (v: string) => void
+  onSave: (field: EditableField, value: string) => void
+  className?: string
+}
+
+function EditableSelect({ field, value, options, isEditing, draft, inputRef, onStartEdit, onDraftChange, onSave, className }: EditableSelectProps) {
+  if (isEditing) {
+    return (
+      <select
+        ref={inputRef as React.RefObject<HTMLSelectElement>}
+        className="editable-select"
+        value={draft}
+        onChange={(e) => onDraftChange(e.target.value)}
+        onBlur={() => onSave(field, draft)}
+      >
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+  }
+  return (
+    <span className={`editable ${className ?? 'badge'}`} onClick={() => onStartEdit(field, value)}>
+      {value}
+    </span>
+  )
+}
+
+function getInterestClass(interest: string) {
+  if (interest === 'Élevé' || interest === 'Très élevé') return 'interest-badge interest-high'
+  if (interest === 'Moyen') return 'interest-badge interest-medium'
+  return 'interest-badge interest-low'
+}
+
 export default function ToolModal({ tool, categories, onClose, onUpdated }: Props) {
   const [editingField, setEditingField] = useState<EditableField | null>(null)
   const [draft, setDraft] = useState('')
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const selectRef = useRef<HTMLSelectElement | null>(null)
 
   useEffect(() => {
-    if (editingField && inputRef.current) {
-      inputRef.current.focus()
+    if (editingField) {
+      textareaRef.current?.focus()
+      selectRef.current?.focus()
     }
   }, [editingField])
 
-  // Close on Escape key
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (editingField) setEditingField(null); else onClose() } }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (editingField) setEditingField(null)
+        else onClose()
+      }
+    }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [editingField, onClose])
@@ -47,57 +125,18 @@ export default function ToolModal({ tool, categories, onClose, onUpdated }: Prop
     setEditingField(null)
   }
 
-  function startEdit(field: EditableField) {
-    setDraft(String(tool![field] ?? ''))
+  function startEdit(field: EditableField, value: string) {
+    setDraft(value)
     setEditingField(field)
   }
 
-  function getInterestClass(interest: string) {
-    if (interest === 'Élevé' || interest === 'Très élevé') return 'interest-badge interest-high'
-    if (interest === 'Moyen') return 'interest-badge interest-medium'
-    return 'interest-badge interest-low'
-  }
-
-  function EditableText({ field }: { field: EditableField }) {
-    const value = String(tool![field] ?? '')
-    if (editingField === field) {
-      return (
-        <textarea
-          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-          className="editable-textarea"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => saveField(field, draft)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setEditingField(null) }}
-        />
-      )
-    }
-    return (
-      <span className="editable" onClick={() => startEdit(field)}>
-        {value || <em style={{ color: 'var(--text-dim)' }}>Cliquer pour éditer…</em>}
-      </span>
-    )
-  }
-
-  function EditableSelect({ field, options }: { field: EditableField; options: string[] }) {
-    const value = String(tool![field] ?? '')
-    if (editingField === field) {
-      return (
-        <select
-          ref={inputRef as React.RefObject<HTMLSelectElement>}
-          className="editable-select"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => saveField(field, draft)}
-        >
-          {options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      )
-    }
-    return <span className="editable badge" onClick={() => startEdit(field)}>{value}</span>
-  }
-
   const allCategoryOptions = [...new Set([...categories, tool.category])]
+
+  const textFields: Array<{ field: EditableField; label: string }> = [
+    { field: 'what_is_it', label: 'Qu\'est-ce que c\'est ?' },
+    { field: 'what_for', label: 'À quoi ça sert' },
+    { field: 'studio_interest', label: 'Intérêt pour 40-60' },
+  ]
 
   return (
     <div
@@ -108,20 +147,50 @@ export default function ToolModal({ tool, categories, onClose, onUpdated }: Prop
         <button className="modal-close" onClick={onClose}>×</button>
 
         <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
-          <EditableText field="name" />
+          <EditableText
+            field="name"
+            value={tool.name}
+            isEditing={editingField === 'name'}
+            draft={draft}
+            inputRef={textareaRef}
+            onStartEdit={startEdit}
+            onDraftChange={setDraft}
+            onSave={saveField}
+            onCancelEdit={() => setEditingField(null)}
+          />
         </h2>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-          <EditableSelect field="type" options={TOOL_TYPES} />
-          <EditableSelect field="category" options={allCategoryOptions} />
+          <EditableSelect
+            field="type"
+            value={tool.type}
+            options={TOOL_TYPES}
+            isEditing={editingField === 'type'}
+            draft={draft}
+            inputRef={selectRef}
+            onStartEdit={startEdit}
+            onDraftChange={setDraft}
+            onSave={saveField}
+          />
+          <EditableSelect
+            field="category"
+            value={tool.category}
+            options={allCategoryOptions}
+            isEditing={editingField === 'category'}
+            draft={draft}
+            inputRef={selectRef}
+            onStartEdit={startEdit}
+            onDraftChange={setDraft}
+            onSave={saveField}
+          />
           <span
             className={getInterestClass(tool.interest)}
-            onClick={() => startEdit('interest')}
+            onClick={() => startEdit('interest', tool.interest)}
             style={{ cursor: 'pointer' }}
           >
             {editingField === 'interest' ? (
               <select
-                ref={inputRef as React.RefObject<HTMLSelectElement>}
+                ref={selectRef}
                 className="editable-select"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -133,20 +202,26 @@ export default function ToolModal({ tool, categories, onClose, onUpdated }: Prop
           </span>
         </div>
 
-        <h3 style={{ margin: '0 0 8px', color: 'var(--accent)', fontSize: 15 }}>
-          Qu&apos;est-ce que c&apos;est ?
-        </h3>
-        <p style={{ margin: '0 0 20px' }}><EditableText field="what_is_it" /></p>
-
-        <h3 style={{ margin: '0 0 8px', color: 'var(--accent)', fontSize: 15 }}>
-          À quoi ça sert
-        </h3>
-        <p style={{ margin: '0 0 20px' }}><EditableText field="what_for" /></p>
-
-        <h3 style={{ margin: '0 0 8px', color: 'var(--accent)', fontSize: 15 }}>
-          Intérêt pour 40-60
-        </h3>
-        <p style={{ margin: '0 0 20px' }}><EditableText field="studio_interest" /></p>
+        {textFields.map(({ field, label }) => (
+          <div key={field}>
+            <h3 style={{ margin: '0 0 8px', color: 'var(--accent)', fontSize: 15 }}>
+              {label}
+            </h3>
+            <p style={{ margin: '0 0 20px' }}>
+              <EditableText
+                field={field}
+                value={String(tool[field] ?? '')}
+                isEditing={editingField === field}
+                draft={draft}
+                inputRef={textareaRef}
+                onStartEdit={startEdit}
+                onDraftChange={setDraft}
+                onSave={saveField}
+                onCancelEdit={() => setEditingField(null)}
+              />
+            </p>
+          </div>
+        ))}
 
         <div style={{ marginTop: 16, fontSize: 13, color: 'var(--text-dim)' }}>
           <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>

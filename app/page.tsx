@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
 import type { Tool, Category } from '@/lib/types'
 import ToolFilters from '@/components/ToolFilters'
@@ -15,7 +15,7 @@ export default function Home() {
   const [selectedType, setSelectedType] = useState('')
   const [activeTool, setActiveTool] = useState<Tool | null>(null)
 
-  const supabase = createSupabaseClient()
+  const supabase = useMemo(() => createSupabaseClient(), [])
 
   const loadData = useCallback(async () => {
     const [toolsRes, catsRes] = await Promise.all([
@@ -24,7 +24,7 @@ export default function Home() {
     ])
     if (toolsRes.data) setTools(toolsRes.data as Tool[])
     if (catsRes.data) setCategories((catsRes.data as Category[]).map((c) => c.name))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase])
 
   useEffect(() => {
     loadData()
@@ -44,7 +44,7 @@ export default function Home() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [loadData]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadData, supabase])
 
   function handleToolUpdated(updated: Tool) {
     setTools((prev) => prev.map((t) => t.id === updated.id ? updated : t))

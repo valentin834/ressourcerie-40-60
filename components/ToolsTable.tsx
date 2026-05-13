@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import type { Tool } from '@/lib/types'
 
-type SortKey = 'name' | 'type' | 'category' | 'interest' | 'added_at'
+type SortKey = 'name' | 'type' | 'category' | 'interest' | 'added_at' | 'implementation_time'
 type SortDir = 'asc' | 'desc'
 
 const INTEREST_ORDER: Record<string, number> = { 'Faible': 0, 'Moyen': 1, 'Élevé': 2, 'Très élevé': 3 }
@@ -14,6 +14,23 @@ interface Props {
   selectedCategory: string
   selectedType: string
   onRowClick: (tool: Tool) => void
+}
+
+interface SortIconProps {
+  col: SortKey
+  sortKey: SortKey
+  sortDir: SortDir
+}
+
+function SortIcon({ col, sortKey, sortDir }: SortIconProps) {
+  if (sortKey !== col) return <span className="sort-icon">↕</span>
+  return <span className="sort-icon">{sortDir === 'asc' ? '↑' : '↓'}</span>
+}
+
+function getInterestClass(interest: string) {
+  if (interest === 'Élevé' || interest === 'Très élevé') return 'interest-badge interest-high'
+  if (interest === 'Moyen') return 'interest-badge interest-medium'
+  return 'interest-badge interest-low'
 }
 
 export default function ToolsTable({ tools, query, selectedCategory, selectedType, onRowClick }: Props) {
@@ -27,11 +44,6 @@ export default function ToolsTable({ tools, query, selectedCategory, selectedTyp
       setSortKey(key)
       setSortDir('asc')
     }
-  }
-
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <span className="sort-icon">↕</span>
-    return <span className="sort-icon">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
   const filtered = useMemo(() => {
@@ -60,28 +72,27 @@ export default function ToolsTable({ tools, query, selectedCategory, selectedTyp
     })
   }, [filtered, sortKey, sortDir])
 
-  function getInterestClass(interest: string) {
-    if (interest === 'Élevé' || interest === 'Très élevé') return 'interest-badge interest-high'
-    if (interest === 'Moyen') return 'interest-badge interest-medium'
-    return 'interest-badge interest-low'
-  }
-
   if (sorted.length === 0) {
     return <div className="empty">Aucun outil ne correspond.</div>
   }
+
+  const columns: Array<{ key: SortKey; label: string }> = [
+    { key: 'name', label: 'Outil' },
+    { key: 'type', label: 'Type' },
+    { key: 'category', label: 'Catégorie' },
+  ]
 
   return (
     <table>
       <thead>
         <tr>
-          {(['name', 'type', 'category'] as SortKey[]).map((key) => (
+          {columns.map(({ key, label }) => (
             <th
               key={key}
               onClick={() => toggleSort(key)}
               className={sortKey === key ? `sort-${sortDir}` : ''}
             >
-              {key === 'name' ? 'Outil' : key === 'type' ? 'Type' : 'Catégorie'}
-              {' '}<SortIcon col={key} />
+              {label} <SortIcon col={key} sortKey={sortKey} sortDir={sortDir} />
             </th>
           ))}
           <th>Mots-clés</th>
@@ -89,9 +100,14 @@ export default function ToolsTable({ tools, query, selectedCategory, selectedTyp
             onClick={() => toggleSort('interest')}
             className={sortKey === 'interest' ? `sort-${sortDir}` : ''}
           >
-            Intérêt 40-60 <SortIcon col="interest" />
+            Intérêt 40-60 <SortIcon col="interest" sortKey={sortKey} sortDir={sortDir} />
           </th>
-          <th>Implémentation</th>
+          <th
+            onClick={() => toggleSort('implementation_time')}
+            className={sortKey === 'implementation_time' ? `sort-${sortDir}` : ''}
+          >
+            Implémentation <SortIcon col="implementation_time" sortKey={sortKey} sortDir={sortDir} />
+          </th>
         </tr>
       </thead>
       <tbody>
