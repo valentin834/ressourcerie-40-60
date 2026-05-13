@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
 import type { Tool, Category } from '@/lib/types'
