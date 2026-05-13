@@ -42,6 +42,11 @@ describe('extractUrls', () => {
   it('returns empty array for no URLs', () => {
     expect(extractUrls('no links here')).toEqual([])
   })
+
+  it('strips trailing punctuation from URLs', () => {
+    expect(extractUrls('Check https://example.com.')).toEqual(['https://example.com'])
+    expect(extractUrls('See https://example.com, it is great')).toEqual(['https://example.com'])
+  })
 })
 
 describe('buildDetectionBlocks', () => {

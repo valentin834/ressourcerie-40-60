@@ -22,7 +22,7 @@ export function verifySlackSignature(
 
 export function extractUrls(text: string): string[] {
   const matches = text.match(/https?:\/\/[^\s<>"]+/gi) || []
-  return [...new Set(matches)]
+  return [...new Set(matches.map((url) => url.replace(/[.,;:!?)]+$/, '')))].filter(Boolean)
 }
 
 export function buildDetectionBlocks(url: string) {

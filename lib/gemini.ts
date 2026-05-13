@@ -31,11 +31,7 @@ Contenu : ${content.body}`
 }
 
 export function parseGeminiResponse(raw: string): GeminiAnalysis {
-  const cleaned = raw
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim()
+  const cleaned = raw.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim()
   return JSON.parse(cleaned) as GeminiAnalysis
 }
 
