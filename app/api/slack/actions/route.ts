@@ -19,11 +19,16 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
   const supabase = createSupabaseClient()
 
   // Duplicate check
-  const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from('tools')
     .select('id, name')
     .eq('url', url)
     .maybeSingle()
+
+  if (lookupError) {
+    console.error('[actions/processTool] DB lookup error:', lookupError.message, lookupError.code)
+    throw lookupError
+  }
 
   if (existing) {
     await postToSlack(responseUrl, `ℹ️ *${existing.name}* est déjà dans la ressourcerie. <${APP_URL}|Voir la BDD>`)
@@ -50,7 +55,10 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
 
   // Save to DB
   const { error } = await supabase.from('tools').insert({ ...analysis, url, added_by: addedBy })
-  if (error) throw error
+  if (error) {
+    console.error('[actions/processTool] DB insert error:', error.message, error.code)
+    throw error
+  }
 
   await postToSlack(responseUrl, `✅ *${analysis.name}* ajouté à la ressourcerie ! <${APP_URL}|Voir la BDD>`)
 }

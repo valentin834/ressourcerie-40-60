@@ -1,7 +1,5 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
 import type { Tool, Category } from '@/lib/types'
@@ -16,17 +14,37 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedType, setSelectedType] = useState('')
   const [activeTool, setActiveTool] = useState<Tool | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const supabase = useMemo(() => createSupabaseClient(), [])
 
   const loadData = useCallback(async () => {
-    const [toolsRes, catsRes] = await Promise.all([
-      supabase.from('tools').select('*').order('added_at', { ascending: false }),
-      supabase.from('categories').select('*').order('name'),
-    ])
-    if (toolsRes.data) setTools(toolsRes.data as Tool[])
-    if (catsRes.data) setCategories((catsRes.data as Category[]).map((c) => c.name))
-  }, [supabase])
+    setError(null)
+    try {
+      const [toolsRes, catsRes] = await Promise.all([
+        fetch('/api/tools'),
+        fetch('/api/categories'),
+      ])
+
+      const toolsJson = await toolsRes.json()
+      const catsJson = await catsRes.json()
+
+      if (!toolsRes.ok) {
+        setError(toolsJson.error ?? 'Erreur lors du chargement des outils.')
+        return
+      }
+      if (!catsRes.ok) {
+        setError(catsJson.error ?? 'Erreur lors du chargement des catégories.')
+        return
+      }
+
+      setTools(toolsJson as Tool[])
+      setCategories((catsJson as Category[]).map((c) => c.name))
+    } catch (err) {
+      setError('Impossible de contacter le serveur. Vérifiez votre connexion.')
+      console.error('[page] loadData error:', err)
+    }
+  }, [])
 
   useEffect(() => {
     loadData()
@@ -63,6 +81,20 @@ export default function Home() {
           Base de connaissances des outils, tips et ressources évalués pour le studio.
         </div>
       </header>
+
+      {error && (
+        <div style={{
+          background: '#2d1515',
+          border: '1px solid #7a2020',
+          borderRadius: 8,
+          padding: '12px 16px',
+          marginBottom: 20,
+          color: '#f87',
+          fontSize: 14,
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
 
       <div className="toolbar">
         <input
