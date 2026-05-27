@@ -48,7 +48,8 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
   let analysis
   try {
     analysis = await analyzeUrl(content)
-  } catch {
+  } catch (err) {
+    console.error('[actions/processTool] Gemini error:', err)
     await postToSlack(responseUrl, `⚠️ Analyse incomplète — <${APP_URL}|Compléter manuellement>`)
     return
   }
