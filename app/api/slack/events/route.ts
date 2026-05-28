@@ -37,7 +37,10 @@ export async function POST(req: NextRequest) {
     channel: event.channel,
     thread_ts: event.ts,
     ...buildDetectionBlocks(urls[0]),
-  }).catch(console.error)
+  }).catch((err) => {
+    console.error('[events] postMessage error:', err?.data?.error ?? err?.message ?? err)
+    console.error('[events] channel:', event.channel, 'urls:', urls)
+  })
 
   return new NextResponse('', { status: 200 })
 }
