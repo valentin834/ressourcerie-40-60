@@ -35,13 +35,14 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
     return
   }
 
-  // Scrape
+  // Scrape — fall back to URL-only if site is protected or unreachable
   let content
   try {
     content = await scrapeUrl(url)
-  } catch {
-    await postToSlack(responseUrl, `⚠️ Impossible d'accéder à ce lien.`)
-    return
+  } catch (err) {
+    console.warn('[actions/processTool] Scrape failed, falling back to URL-only:', (err as Error).message)
+    const hostname = new URL(url).hostname
+    content = { title: hostname, description: url, body: '' }
   }
 
   // Gemini analysis
