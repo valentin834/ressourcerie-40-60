@@ -28,6 +28,7 @@ export function extractUrls(text: string): string[] {
 export function buildDetectionBlocks(url: string) {
   const hostname = new URL(url).hostname
   return {
+    text: `🔗 Lien détecté : ${hostname} — veux-tu l'ajouter à la ressourcerie ?`,
     blocks: [
       {
         type: 'section',
