@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { verifySlackSignature } from '@/lib/slack'
 import { scrapeUrl } from '@/lib/scraper'
 import { analyzeUrl } from '@/lib/gemini'
-import { addTool } from '@/lib/github-storage'
+import { addTool } from '@/lib/slack-storage'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
@@ -21,7 +21,7 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
   try {
     content = await scrapeUrl(url)
   } catch (err) {
-    console.warn('[actions/processTool] Scrape failed, falling back to URL-only analysis:', (err as Error).message)
+    console.warn('[actions/processTool] Scrape failed, falling back to URL-only:', (err as Error).message)
     const hostname = new URL(url).hostname
     content = { title: hostname, description: url, body: '' }
   }
@@ -36,7 +36,7 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
     return
   }
 
-  // Save to GitHub storage
+  // Save to Slack storage
   try {
     const { duplicate } = await addTool(analysis, url, addedBy)
     if (duplicate) {
@@ -44,7 +44,7 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
       return
     }
   } catch (err) {
-    console.error('[actions/processTool] GitHub storage error:', (err as Error).message)
+    console.error('[actions/processTool] storage error:', (err as Error).message)
     await postToSlack(responseUrl, `⚠️ Erreur de sauvegarde — <${APP_URL}|Ajouter manuellement>`)
     return
   }
@@ -77,7 +77,6 @@ export async function POST(req: NextRequest) {
   const responseUrl: string = payload.response_url
   const addedBy: string = payload.user?.name ?? payload.user?.id ?? 'unknown'
 
-  // Acknowledge Slack immediately (within 3s), process in background
   waitUntil(
     postToSlack(responseUrl, `⏳ Analyse de \`${new URL(url).hostname}\` en cours…`)
       .then(() => processTool(url, responseUrl, addedBy))

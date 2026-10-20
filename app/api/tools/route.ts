@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileSync } from 'fs'
-import { join } from 'path'
-import { updateToolField } from '@/lib/github-storage'
-import type { Tool } from '@/lib/types'
+import { getTools, updateToolField } from '@/lib/slack-storage'
 
 export async function GET() {
   try {
-    const raw = readFileSync(join(process.cwd(), 'data/tools.json'), 'utf8')
-    const tools = JSON.parse(raw) as Tool[]
+    const tools = await getTools()
     return NextResponse.json(tools)
   } catch (err) {
-    console.error('[api/tools] read error:', (err as Error).message)
+    console.error('[api/tools GET]', (err as Error).message)
     return NextResponse.json([], { status: 200 })
   }
 }
