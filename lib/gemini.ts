@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { ScrapedContent } from './scraper'
 import type { GeminiAnalysis } from './types'
+import { TOOL_TYPES, INTEREST_LEVELS } from './types'
 
 const SYSTEM_CONTEXT = `Tu es un assistant qui analyse des outils et ressources pour 40-60 Studio, une agence spécialisée en UX/UI design et développement web/mobile. L'équipe travaille sur des projets clients (interfaces, applications mobiles, sites web), utilise des outils de design (Figma, etc.), de développement (React, Next.js, TypeScript) et s'intéresse aux intelligences artificielles génératives pour accélérer la production créative et technique.`
 
@@ -30,9 +31,23 @@ Description : ${content.description}
 Contenu : ${content.body}`
 }
 
+function normalizeEnum<T extends string>(value: string, valid: readonly T[], fallback: T): T {
+  const normalized = value?.trim() ?? ''
+  // Exact match
+  if ((valid as readonly string[]).includes(normalized)) return normalized as T
+  // Case-insensitive match, ignoring accents
+  const strip = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const stripped = strip(normalized)
+  const match = valid.find(v => strip(v) === stripped || strip(v).startsWith(stripped) || stripped.startsWith(strip(v)))
+  return match ?? fallback
+}
+
 export function parseGeminiResponse(raw: string): GeminiAnalysis {
   const cleaned = raw.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim()
-  return JSON.parse(cleaned) as GeminiAnalysis
+  const parsed = JSON.parse(cleaned) as GeminiAnalysis
+  parsed.type = normalizeEnum(parsed.type, TOOL_TYPES, 'Outil')
+  parsed.interest = normalizeEnum(parsed.interest, INTEREST_LEVELS, 'Moyen')
+  return parsed
 }
 
 export async function analyzeUrl(content: ScrapedContent): Promise<GeminiAnalysis> {
