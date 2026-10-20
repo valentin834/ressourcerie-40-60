@@ -1,13 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/keepalive",
-      "schedule": "0 8 * * *"
-    }
-  ],
-  "functions": {
-    "app/api/keepalive/route.ts": {
-      "maxDuration": 60
-    }
-  }
-}
+{}

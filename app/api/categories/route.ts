@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseClient } from '@/lib/supabase'
+import type { Category } from '@/lib/types'
+
+const CATEGORIES: Category[] = [
+  { id: 1, name: 'Création vidéo & image' },
+  { id: 2, name: 'Design & branding' },
+  { id: 3, name: 'Dev & code' },
+  { id: 4, name: 'Productivité' },
+  { id: 5, name: 'Automatisation' },
+]
 
 export async function GET() {
-  const supabase = createSupabaseClient()
-  const { data, error } = await supabase
-    .from('categories')
-    .select('*')
-    .order('name')
-
-  if (error) {
-    console.error('[api/categories]', error.message, error.code)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json(data)
+  return NextResponse.json(CATEGORIES)
 }

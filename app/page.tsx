@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createSupabaseClient } from '@/lib/supabase'
+import { useEffect, useState, useCallback } from 'react'
 import type { Tool, Category } from '@/lib/types'
 import ToolFilters from '@/components/ToolFilters'
 import ToolsTable from '@/components/ToolsTable'
@@ -15,8 +14,6 @@ export default function Home() {
   const [selectedType, setSelectedType] = useState('')
   const [activeTool, setActiveTool] = useState<Tool | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const supabase = useMemo(() => createSupabaseClient(), [])
 
   const loadData = useCallback(async () => {
     setError(null)
@@ -48,23 +45,10 @@ export default function Home() {
 
   useEffect(() => {
     loadData()
-
-    const channel = supabase
-      .channel('tools-changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'tools' },
-        (payload) => setTools((prev) => [payload.new as Tool, ...prev])
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'tools' },
-        (payload) => setTools((prev) => prev.map((t) => t.id === (payload.new as Tool).id ? payload.new as Tool : t))
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [loadData, supabase])
+    // Poll every 30s so new tools added via Slack show up without reload
+    const interval = setInterval(loadData, 30_000)
+    return () => clearInterval(interval)
+  }, [loadData])
 
   function handleToolUpdated(updated: Tool) {
     setTools((prev) => prev.map((t) => t.id === updated.id ? updated : t))

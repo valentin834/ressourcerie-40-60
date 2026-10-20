@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { verifySlackSignature } from '@/lib/slack'
 import { scrapeUrl } from '@/lib/scraper'
 import { analyzeUrl } from '@/lib/gemini'
-import { createSupabaseClient } from '@/lib/supabase'
+import { addTool } from '@/lib/github-storage'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
@@ -16,26 +16,6 @@ async function postToSlack(responseUrl: string, text: string) {
 }
 
 async function processTool(url: string, responseUrl: string, addedBy: string) {
-  const supabase = createSupabaseClient()
-
-  // Duplicate check
-  const { data: existing, error: lookupError } = await supabase
-    .from('tools')
-    .select('id, name')
-    .eq('url', url)
-    .maybeSingle()
-
-  if (lookupError) {
-    console.error('[actions/processTool] DB lookup error:', lookupError.message, lookupError.code)
-    await postToSlack(responseUrl, `⚠️ Base de données inaccessible (${lookupError.code}) — vérifier Supabase. <${APP_URL}|Voir la BDD>`)
-    return
-  }
-
-  if (existing) {
-    await postToSlack(responseUrl, `ℹ️ *${existing.name}* est déjà dans la ressourcerie. <${APP_URL}|Voir la BDD>`)
-    return
-  }
-
   // Scrape — fall back to URL-only if site is protected or unreachable
   let content
   try {
@@ -56,11 +36,16 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
     return
   }
 
-  // Save to DB
-  const { error } = await supabase.from('tools').insert({ ...analysis, url, added_by: addedBy })
-  if (error) {
-    console.error('[actions/processTool] DB insert error:', error.message, error.code)
-    await postToSlack(responseUrl, `⚠️ Erreur base de données (${error.code}) — <${APP_URL}|Compléter manuellement>`)
+  // Save to GitHub storage
+  try {
+    const { duplicate } = await addTool(analysis, url, addedBy)
+    if (duplicate) {
+      await postToSlack(responseUrl, `ℹ️ *${duplicate}* est déjà dans la ressourcerie. <${APP_URL}|Voir la BDD>`)
+      return
+    }
+  } catch (err) {
+    console.error('[actions/processTool] GitHub storage error:', (err as Error).message)
+    await postToSlack(responseUrl, `⚠️ Erreur de sauvegarde — <${APP_URL}|Ajouter manuellement>`)
     return
   }
 

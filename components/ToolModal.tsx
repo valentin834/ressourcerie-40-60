@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Tool } from '@/lib/types'
 import { TOOL_TYPES, INTEREST_LEVELS } from '@/lib/types'
-import { createSupabaseClient } from '@/lib/supabase'
 
 interface Props {
   tool: Tool | null
@@ -114,14 +113,19 @@ export default function ToolModal({ tool, categories, onClose, onUpdated }: Prop
 
   async function saveField(field: EditableField, value: string) {
     if (!tool) return
-    const supabase = createSupabaseClient()
-    const { data, error } = await supabase
-      .from('tools')
-      .update({ [field]: value })
-      .eq('id', tool.id)
-      .select()
-      .single()
-    if (!error && data) onUpdated(data as Tool)
+    try {
+      const res = await fetch('/api/tools', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: tool.id, field, value }),
+      })
+      if (res.ok) {
+        const updated = await res.json() as Tool
+        onUpdated(updated)
+      }
+    } catch (err) {
+      console.error('[ToolModal] saveField error:', err)
+    }
     setEditingField(null)
   }
 
