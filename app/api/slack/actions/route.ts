@@ -27,7 +27,8 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
 
   if (lookupError) {
     console.error('[actions/processTool] DB lookup error:', lookupError.message, lookupError.code)
-    throw lookupError
+    await postToSlack(responseUrl, `⚠️ Base de données inaccessible (${lookupError.code}) — vérifier Supabase. <${APP_URL}|Voir la BDD>`)
+    return
   }
 
   if (existing) {
@@ -49,8 +50,9 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
   let analysis
   try {
     analysis = await analyzeUrl(content)
-  } catch {
-    await postToSlack(responseUrl, `⚠️ Analyse incomplète — <${APP_URL}|Compléter manuellement>`)
+  } catch (err) {
+    console.error('[actions/processTool] Gemini error:', (err as Error).message)
+    await postToSlack(responseUrl, `⚠️ Analyse IA échouée — <${APP_URL}|Compléter manuellement>`)
     return
   }
 
@@ -58,7 +60,8 @@ async function processTool(url: string, responseUrl: string, addedBy: string) {
   const { error } = await supabase.from('tools').insert({ ...analysis, url, added_by: addedBy })
   if (error) {
     console.error('[actions/processTool] DB insert error:', error.message, error.code)
-    throw error
+    await postToSlack(responseUrl, `⚠️ Erreur base de données (${error.code}) — <${APP_URL}|Compléter manuellement>`)
+    return
   }
 
   await postToSlack(responseUrl, `✅ *${analysis.name}* ajouté à la ressourcerie ! <${APP_URL}|Voir la BDD>`)
