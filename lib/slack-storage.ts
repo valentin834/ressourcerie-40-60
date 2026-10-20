@@ -1,8 +1,9 @@
 import { WebClient } from '@slack/web-api'
 import type { Tool, GeminiAnalysis } from './types'
 
-// Dedicated channel for tool storage — C0CA5NU2M71 = #ressourcerie-bdd
-const DB_CHANNEL = 'C0CA5NU2M71'
+// valentin@40-60studio.com — owner of the Slack workspace
+// DM between the bot and this user is the storage channel
+const OWNER_USER_ID = 'U9DEY8FB9'
 
 function getSlack() {
   const token = process.env.SLACK_BOT_TOKEN
@@ -10,25 +11,19 @@ function getSlack() {
   return new WebClient(token)
 }
 
-async function ensureJoined(slack: WebClient) {
-  try {
-    await slack.conversations.join({ channel: DB_CHANNEL })
-  } catch {
-    // Already a member or missing scope — proceed anyway
-  }
+async function getDmChannel(slack: WebClient): Promise<string> {
+  const res = await slack.conversations.open({ users: OWNER_USER_ID })
+  if (!res.ok || !res.channel?.id) throw new Error('Cannot open DM channel')
+  return res.channel.id
 }
 
-async function fetchAllMessages(slack: WebClient): Promise<Array<{ text: string }>> {
+async function fetchAllMessages(slack: WebClient, channel: string): Promise<Array<{ text: string }>> {
   const messages: Array<{ text: string }> = []
   let cursor: string | undefined
 
   do {
-    const res = await slack.conversations.history({
-      channel: DB_CHANNEL,
-      limit: 200,
-      cursor,
-    })
-    const page = (res.messages ?? []) as Array<{ text?: string; cursor_next?: string }>
+    const res = await slack.conversations.history({ channel, limit: 200, cursor })
+    const page = (res.messages ?? []) as Array<{ text?: string }>
     for (const m of page) {
       if (m.text) messages.push({ text: m.text })
     }
@@ -40,13 +35,13 @@ async function fetchAllMessages(slack: WebClient): Promise<Array<{ text: string 
 
 export async function getTools(): Promise<Tool[]> {
   const slack = getSlack()
-  await ensureJoined(slack)
-  const messages = await fetchAllMessages(slack)
+  const channel = await getDmChannel(slack)
+  const messages = await fetchAllMessages(slack, channel)
 
   const toolsById = new Map<string, Tool>()
   const updates: Array<{ id: string; field: string; value: string }> = []
 
-  // Messages come newest-first; iterate so older messages are processed first
+  // Messages come newest-first; reverse so oldest is processed first
   for (const m of [...messages].reverse()) {
     const text = m.text
     if (text.startsWith('TOOL_DATA:')) {
@@ -62,7 +57,7 @@ export async function getTools(): Promise<Tool[]> {
     }
   }
 
-  // Apply updates (in order, oldest first — already reversed)
+  // Apply updates in chronological order
   for (const upd of updates) {
     const tool = toolsById.get(upd.id)
     if (tool) toolsById.set(upd.id, { ...tool, [upd.field]: upd.value })
@@ -79,7 +74,7 @@ export async function addTool(
   addedBy: string,
 ): Promise<{ duplicate: string | null }> {
   const slack = getSlack()
-  await ensureJoined(slack)
+  const channel = await getDmChannel(slack)
 
   // Duplicate check
   const existing = await getTools()
@@ -87,19 +82,9 @@ export async function addTool(
   if (dup) return { duplicate: dup.name }
 
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const tool: Tool = {
-    id,
-    url,
-    added_by: addedBy,
-    added_at: new Date().toISOString(),
-    ...analysis,
-  }
+  const tool: Tool = { id, url, added_by: addedBy, added_at: new Date().toISOString(), ...analysis }
 
-  await slack.chat.postMessage({
-    channel: DB_CHANNEL,
-    text: `TOOL_DATA:${JSON.stringify(tool)}`,
-  })
-
+  await slack.chat.postMessage({ channel, text: `TOOL_DATA:${JSON.stringify(tool)}` })
   return { duplicate: null }
 }
 
@@ -109,16 +94,12 @@ export async function updateToolField(
   value: string,
 ): Promise<Tool | null> {
   const slack = getSlack()
-  await ensureJoined(slack)
+  const channel = await getDmChannel(slack)
 
   const tools = await getTools()
   const tool = tools.find((t) => t.id === id)
   if (!tool) return null
 
-  await slack.chat.postMessage({
-    channel: DB_CHANNEL,
-    text: `TOOL_UPDATE:${JSON.stringify({ id, field, value })}`,
-  })
-
+  await slack.chat.postMessage({ channel, text: `TOOL_UPDATE:${JSON.stringify({ id, field, value })}` })
   return { ...tool, [field]: value }
 }
